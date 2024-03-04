@@ -10,6 +10,7 @@ on:
       - ci-*
       - refactor-*
       - fix-*
+      - test-*
     paths:
       - '.github/workflows/**'
       - '**/Cargo.toml'
