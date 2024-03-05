@@ -268,6 +268,8 @@ pub(crate) async fn rag_doc_chunks_to_embeddings_handler(
 pub(crate) async fn rag_doc_chunks_to_embeddings2_handler(
     mut req: Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {
+    println!("\n\n[+] Compute embeddings for document chunks and persist them in the specified Qdrant server");
+
     // parse request
     let body_bytes = to_bytes(req.body_mut()).await?;
     let embedding_request: EmbeddingRequest = match serde_json::from_slice(&body_bytes) {
@@ -353,6 +355,7 @@ pub(crate) async fn rag_query_handler(
     };
 
     // compute embeddings for user query
+    println!("    * Computing embeddings for user query ...");
     let embedding_response = match rag_chat_request.messages.is_empty() {
         true => return error::bad_request("Messages should not be empty"),
         false => {
@@ -397,6 +400,7 @@ pub(crate) async fn rag_query_handler(
     };
 
     // retrieve context
+    println!("    * Searching for similar points ...");
     let scored_points = match llama_core::rag::rag_retrieve_context(
         query_embedding.as_slice(),
         rag_chat_request.qdrant_url.as_str(),
@@ -417,11 +421,11 @@ pub(crate) async fn rag_query_handler(
     // update messages with retrieved context
     let mut context = String::new();
     for (idx, point) in scored_points.iter().enumerate() {
-        println!("    * Point {}: score: {}", idx, point.score);
+        println!("      * Point {}: score: {}", idx, point.score);
 
         if let Some(payload) = &point.payload {
             if let Some(source) = payload.get("source") {
-                println!("      Source: {}", source);
+                println!("        Source: {}", source);
 
                 context.push_str(source.to_string().as_str());
                 context.push_str("\n\n");
@@ -462,6 +466,8 @@ pub(crate) async fn rag_query2_handler(
     template_ty: PromptTemplateType,
     log_prompts: bool,
 ) -> Result<Response<Body>, hyper::Error> {
+    println!("\n[+] Query a user input and return a chat-completion response with the answer from the model");
+
     if req.method().eq(&hyper::http::Method::OPTIONS) {
         let result = Response::builder()
             .header("Access-Control-Allow-Origin", "*")
@@ -572,7 +578,7 @@ pub(crate) async fn rag_query2_handler(
             }
         }
     }
-    println!("\n\n");
+    // println!("\n\n");
 
     // prepare system message
     let content = format!("Use the following pieces of context to answer the user's question.\nIf you don't know the answer, just say that you don't know, don't try to make up an answer.\n----------------\n{}", context.trim_end());
@@ -592,6 +598,7 @@ pub(crate) async fn rag_query2_handler(
     }
 
     // chat completion
+    println!("\n[+] Chat completion with the context");
     match chat_request.stream {
         Some(true) => chat_completions_stream(chat_request, template_ty, log_prompts).await,
         Some(false) | None => chat_completions(chat_request, template_ty, log_prompts).await,

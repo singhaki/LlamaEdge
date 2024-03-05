@@ -93,10 +93,9 @@ async fn qdrant_create_collection(
     collection_name: impl AsRef<str>,
     dim: usize,
 ) -> Result<(), LlamaCoreError> {
-    println!("\n[+] Creating a collection ...");
-    // let collection_name = "my_test";
-    println!("    * Collection name: {}", collection_name.as_ref());
-    println!("    * Dimension: {}", dim);
+    println!("    * Creating a collection ...");
+    println!("      * Collection name: {}", collection_name.as_ref());
+    println!("      * Dimension: {}", dim);
     if let Err(err) = qdrant_client
         .create_collection(collection_name.as_ref(), dim as u32)
         .await
@@ -114,7 +113,7 @@ async fn qdrant_persist_embeddings(
     embeddings: &[EmbeddingObject],
     chunks: &[String],
 ) -> Result<(), LlamaCoreError> {
-    println!("[+] Creating points to save embeddings ...");
+    println!("    * Creating points to save embeddings ...");
     let mut points = Vec::<Point>::new();
     for embedding in embeddings {
         // convert the embedding to a vector
@@ -136,7 +135,7 @@ async fn qdrant_persist_embeddings(
     }
 
     // upsert points
-    println!("[+] Upserting points ...");
+    println!("    * Upserting points ...");
     if let Err(err) = qdrant_client
         .upsert_points(collection_name.as_ref(), points)
         .await
@@ -154,7 +153,6 @@ async fn qdrant_search_similar_points(
     query_vector: &[f32],
     limit: usize,
 ) -> Result<Vec<ScoredPoint>, String> {
-    println!("[+] Searching for similar points ...");
     let search_result = qdrant_client
         .search_points(
             collection_name.as_ref(),

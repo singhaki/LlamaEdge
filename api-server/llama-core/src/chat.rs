@@ -477,6 +477,12 @@ pub async fn chat_completions(
                 LlamaCoreError::Operation(format!("Fail to get output tensor: {msg}", msg = e))
             })?;
 
+            // ! debug
+            println!(
+                "\n[DEBUG] real_output_size={}, max_buffer_size={}\n",
+                output_size, MAX_BUFFER_SIZE
+            );
+
             output_size = std::cmp::min(MAX_BUFFER_SIZE, output_size);
 
             // convert inference result to string
@@ -486,6 +492,9 @@ pub async fn chat_completions(
                     e
                 ))
             })?;
+
+            // ! debug
+            println!("\n[DEBUG] raw output: \n{}\n", output);
 
             // post-process
             let message = post_process(output, template_ty).map_err(|e| {
@@ -796,10 +805,14 @@ async fn update_metadata(
     if metadata.embeddings {
         metadata.embeddings = false;
 
-        if !should_update {
-            should_update = true;
-        }
+        should_update = true;
     }
+
+    // ! debug
+    println!(
+        "\n[DEBUG](chat) embedding option: expected=false, actual={}\n",
+        metadata.embeddings
+    );
 
     if should_update {
         // update metadata
@@ -1163,7 +1176,6 @@ pub(crate) struct TokenInfo {
 /// Downloads an image from the given URL and returns the file name.
 async fn download_image(image_url: impl AsRef<str>) -> Result<String, LlamaCoreError> {
     let image_url = image_url.as_ref();
-    // println!("[DEBUG] image_url: {}", image_url);
     let url =
         reqwest::Url::parse(image_url).map_err(|e| LlamaCoreError::Operation(e.to_string()))?;
     let response = reqwest::get(url)

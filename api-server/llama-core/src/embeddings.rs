@@ -116,10 +116,14 @@ fn update_metadata() -> Result<(), LlamaCoreError> {
     if !metadata.embeddings {
         metadata.embeddings = true;
 
-        if !should_update {
-            should_update = true;
-        }
+        should_update = true;
     }
+
+    // ! debug
+    println!(
+        "\n[DEBUG](embedding) embedding option: expected=true, actual={}\n",
+        metadata.embeddings
+    );
 
     if should_update {
         // update metadata
