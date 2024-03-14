@@ -79,108 +79,94 @@ pub async fn chat_completions_stream(
                     ))
                 })?;
                 match chat_graphs.get_mut(model_name) {
-                    Some(graph) => // compute
+                    Some(graph) =>
                     match graph.compute_single() {
                         Ok(_) => {
-                            match one_more_run_then_stop {
-                                true => {
-                                    // Retrieve the output
-                                    let mut output_buffer = vec![0u8; MAX_BUFFER_SIZE];
-                                    let mut output_size = graph
-                                        .get_output_single(0, &mut output_buffer)
-                                        .map_err(|e| {
-                                            LlamaCoreError::Backend(BackendError::GetOutputSingle(format!(
-                                                "Fail to get output tensor: {msg}",
-                                                msg = e
-                                            )))
-                                        })?;
-                                    output_size = std::cmp::min(MAX_BUFFER_SIZE, output_size);
+                            // Retrieve the output
+                            let mut output_buffer = vec![0u8; MAX_BUFFER_SIZE];
+                            let mut output_size = graph
+                                .get_output_single(0, &mut output_buffer)
+                                .map_err(|e| {
+                                    LlamaCoreError::Backend(BackendError::GetOutputSingle(format!(
+                                        "Fail to get output tensor: {msg}",
+                                        msg = e
+                                    )))
+                                })?;
+                            output_size = std::cmp::min(MAX_BUFFER_SIZE, output_size);
 
-                                    // decode the output buffer to a utf8 string
-                                    let output = match String::from_utf8(output_buffer[..output_size].to_vec())
-                                    {
-                                        Ok(token) => token,
-                                        Err(_) => {
-                                            let mutex = UTF8_ENCODINGS.get_or_init(|| Mutex::new(Vec::new()));
-                                            let mut cached_encodings = mutex.lock().map_err(|e| {
-                                                LlamaCoreError::Operation(format!(
-                                                    "Fail to acquire the lock of `UTF8_ENCODINGS`. {}",
-                                                    e
-                                                ))
-                                            })?;
-
-                                            cached_encodings.extend_from_slice(&output_buffer[..output_size]);
-
-                                            match String::from_utf8(cached_encodings.to_vec()) {
-                                                Ok(token) => {
-                                                    // clear encodings
-                                                    cached_encodings.clear();
-
-                                                    token
-                                                }
-                                                Err(_) => {
-                                                    // ! This is a temp check. In case, infinite cached encodings happen.
-                                                    if cached_encodings.len() > 3 {
-                                                        return Err(LlamaCoreError::Operation(String::from(
-                                                            "The length of the invalid utf8 bytes exceed 3.",
-                                                        )));
-                                                    }
-
-                                                    String::new()
-                                                }
-                                            }
-                                        }
-                                    };
-
-                                    let created = SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .map_err(|e| {
-                                            LlamaCoreError::Operation(format!(
-                                                "Failed to get the current time. {}",
-                                                e
-                                            ))
-                                        })?;
-
-                                    let chat_completion_chunk = ChatCompletionChunk {
-                                        id: "chatcmpl-123".to_string(),
-                                        object: "chat.completion.chunk".to_string(),
-                                        created: created.as_secs(),
-                                        model: graph.name.clone(),
-                                        system_fingerprint: "fp_44709d6fcb".to_string(),
-                                        choices: vec![ChatCompletionChunkChoice {
-                                            index: 0,
-                                            delta: ChatCompletionChunkChoiceDelta {
-                                                role: Some(ChatCompletionRole::Assistant),
-                                                content: Some(output),
-                                                function_call: None,
-                                                tool_calls: None,
-                                            },
-                                            logprobs: None,
-                                            finish_reason: None,
-                                        }],
-                                    };
-
-                                    // serialize chat completion chunk
-                                    let chunk = serde_json::to_string(&chat_completion_chunk).map_err(|e| {
+                            // decode the output buffer to a utf8 string
+                            let output = match String::from_utf8(output_buffer[..output_size].to_vec())
+                            {
+                                Ok(token) => token,
+                                Err(_) => {
+                                    let mutex = UTF8_ENCODINGS.get_or_init(|| Mutex::new(Vec::new()));
+                                    let mut cached_encodings = mutex.lock().map_err(|e| {
                                         LlamaCoreError::Operation(format!(
-                                            "Failed to serialize chat completion chunk. {}",
+                                            "Fail to acquire the lock of `UTF8_ENCODINGS`. {}",
                                             e
                                         ))
                                     })?;
 
-                                    Ok(chunk)
-                                }
-                                false => {
-                                    // clear context
-                                    if let Err(e) = graph.finish_single() {
-                                        return Err(LlamaCoreError::Backend(BackendError::FinishSingle(
-                                            e.to_string(),
-                                        )));
-                                    }
+                                    cached_encodings.extend_from_slice(&output_buffer[..output_size]);
 
-                                    Ok("[GGML] End of sequence".to_string())
+                                    match String::from_utf8(cached_encodings.to_vec()) {
+                                        Ok(token) => {
+                                            // clear encodings
+                                            cached_encodings.clear();
+
+                                            token
+                                        }
+                                        Err(_) => {
+                                            // ! This is a temp check. In case, infinite cached encodings happen.
+                                            if cached_encodings.len() > 3 {
+                                                return Err(LlamaCoreError::Operation(String::from(
+                                                    "The length of the invalid utf8 bytes exceed 3.",
+                                                )));
+                                            }
+
+                                            String::new()
+                                        }
+                                    }
                                 }
-                            }
+                            };
+
+                            let created = SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map_err(|e| {
+                                    LlamaCoreError::Operation(format!(
+                                        "Failed to get the current time. {}",
+                                        e
+                                    ))
+                                })?;
+
+                            let chat_completion_chunk = ChatCompletionChunk {
+                                id: "chatcmpl-123".to_string(),
+                                object: "chat.completion.chunk".to_string(),
+                                created: created.as_secs(),
+                                model: graph.name.clone(),
+                                system_fingerprint: "fp_44709d6fcb".to_string(),
+                                choices: vec![ChatCompletionChunkChoice {
+                                    index: 0,
+                                    delta: ChatCompletionChunkChoiceDelta {
+                                        role: Some(ChatCompletionRole::Assistant),
+                                        content: Some(output),
+                                        function_call: None,
+                                        tool_calls: None,
+                                    },
+                                    logprobs: None,
+                                    finish_reason: None,
+                                }],
+                            };
+
+                            // serialize chat completion chunk
+                            let chunk = serde_json::to_string(&chat_completion_chunk).map_err(|e| {
+                                LlamaCoreError::Operation(format!(
+                                    "Failed to serialize chat completion chunk. {}",
+                                    e
+                                ))
+                            })?;
+
+                            Ok(chunk)
                         }
                         Err(wasmedge_wasi_nn::Error::BackendError(
                             wasmedge_wasi_nn::BackendError::EndOfSequence,
